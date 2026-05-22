@@ -27,12 +27,10 @@ namespace Bloxstrap.Models.Persistable
         public bool UseFastFlagManager { get; set; } = true;
         public bool WPFSoftwareRender { get; set; } = false;
         public bool EnableAnalytics { get; set; } = false;
-        public bool UpdateRoblox { get; set; } = true;
         public bool StaticDirectory { get; set; } = false;
         public string Channel { get; set; } = RobloxInterfaces.Deployment.DefaultChannel;
         public string RobloxDomain { get; set; } = RobloxInterfaces.Deployment.DefaultRobloxDomain;
         public ChannelChangeMode ChannelChangeMode { get; set; } = ChannelChangeMode.Automatic;
-        public string ChannelHash { get; set; } = "";
         public string? SelectedCustomTheme { get; set; } = null;
         public bool BackgroundUpdatesEnabled { get; set; } = false;
         public bool DebugDisableVersionPackageCleanup { get; set; } = false;

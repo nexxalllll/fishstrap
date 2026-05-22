@@ -1711,6 +1711,15 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to BetterMatchmaking will be disabled for this session..
+        /// </summary>
+        public static string Dialog_Connectivity_MatchmakingFailed {
+            get {
+                return ResourceManager.GetString("Dialog.Connectivity.MatchmakingFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to More information:.
         /// </summary>
         public static string Dialog_Connectivity_MoreInfo {
@@ -2256,15 +2265,6 @@ namespace Bloxstrap.Resources {
         public static string Enums_FlagPresets_RenderingMode_D3D11 {
             get {
                 return ResourceManager.GetString("Enums.FlagPresets.RenderingMode.D3D11", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to OpenGL.
-        /// </summary>
-        public static string Enums_FlagPresets_RenderingMode_OpenGL {
-            get {
-                return ResourceManager.GetString("Enums.FlagPresets.RenderingMode.OpenGL", resourceCulture);
             }
         }
         

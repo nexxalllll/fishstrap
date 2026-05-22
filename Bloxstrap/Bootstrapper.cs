@@ -738,14 +738,24 @@ namespace Bloxstrap
                         isFollowUser = true;
                 }
 
-
-                if (App.Settings.Prop.EnableBetterMatchmaking && _joinData.JoinType != GameJoinType.RequestPrivateGame && _joinData.PlaceId != null && !isFollowUser)
+                try
                 {
-                    string serverid = await GetBetterMatchmakingServerID();
-                    string placeLauncherUrl = UrlBuilder.BuildPlacelauncherUrl((long)_joinData.PlaceId, serverid);
+                    if (App.Settings.Prop.EnableBetterMatchmaking && _joinData.JoinType != GameJoinType.RequestPrivateGame && _joinData.PlaceId != null && !isFollowUser)
+                    {
+                        string serverid = await GetBetterMatchmakingServerID();
+                        string placeLauncherUrl = UrlBuilder.BuildPlacelauncherUrl((long)_joinData.PlaceId, serverid);
 
-                    if (!string.IsNullOrEmpty(serverid))
-                        _launchCommandLine = _launchCommandLine.Replace(_joinData.PlaceLauncherUrl, HttpUtility.UrlEncode(placeLauncherUrl));
+                        if (!string.IsNullOrEmpty(serverid))
+                            _launchCommandLine = _launchCommandLine.Replace(_joinData.PlaceLauncherUrl, HttpUtility.UrlEncode(placeLauncherUrl));
+                    }
+                } catch (HttpRequestException ex)
+                {
+                    Frontend.ShowConnectivityDialog(
+                        String.Format(Strings.Dialog_Connectivity_UnableToConnect, "rovalra.com"),
+                        Strings.Dialog_Connectivity_MatchmakingFailed,
+                        MessageBoxImage.Warning,
+                        ex
+                        );
                 }
 
                 // this needs to be done before roblox launches
@@ -767,26 +777,9 @@ namespace Bloxstrap
                     _launchCommandLine = "roblox://navigation/home"; // fixes a bug on rblx.org where its stuck on the login screen, doesnt affect anything else
             }
 
-            string[] Names = { App.RobloxPlayerAppName, App.RobloxStudioAppName };
-            string ResolvedName = null!;
-
-            foreach (string Name in Names)
-            {
-                string Directory = Path.Combine((string)AppData.Directory, Name);
-                if (File.Exists(Directory))
-                {
-                    ResolvedName = Name;
-                }
-            }
-
-            if (String.IsNullOrEmpty(ResolvedName))
-            {
-                await UpgradeRoblox();
-            }
-
             var startInfo = new ProcessStartInfo()
             {
-                FileName = Path.Combine(AppData.Directory, ResolvedName),
+                FileName = AppData.ExecutablePath,
                 Arguments = _launchCommandLine,
                 WorkingDirectory = AppData.Directory
             };
@@ -1263,24 +1256,6 @@ namespace Bloxstrap
         {
             const string LOG_IDENT = "Bootstrapper::UpgradeRoblox";
             const int THREAD_LIMIT = 5;
-
-            bool CancelUpgrade = !App.Settings.Prop.UpdateRoblox;
-
-            if (CancelUpgrade)
-            {
-                SetStatus(Strings.Bootstrapper_Status_CancelUpgrade);
-                App.Logger.WriteLine(LOG_IDENT, "Upgrading disabled, cancelling the upgrade.");
-                Thread.Sleep(2000);
-            }
-
-            if (CancelUpgrade && !Directory.Exists(_latestVersionDirectory))
-            {
-                Frontend.ShowMessageBox(Strings.Bootstrapper_Dialog_NoUpgradeWithoutClient, MessageBoxImage.Warning, MessageBoxButton.OK);
-            }
-            else if (CancelUpgrade)
-            {
-                return;
-            }
 
             if (String.IsNullOrEmpty(AppData.State.VersionGuid))
                 SetStatus(Strings.Bootstrapper_Status_Installing);
