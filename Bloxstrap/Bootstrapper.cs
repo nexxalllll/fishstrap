@@ -18,6 +18,7 @@ using Bloxstrap.RobloxInterfaces;
 using Bloxstrap.UI.Elements.Bootstrapper.Base;
 using ICSharpCode.SharpZipLib.Zip;
 using Microsoft.Win32;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Data;
 using System.Web;
@@ -1254,6 +1255,7 @@ namespace Bloxstrap
         private async Task UpgradeRoblox()
         {
             const string LOG_IDENT = "Bootstrapper::UpgradeRoblox";
+            const int THREAD_LIMIT = 5;
 
             if (String.IsNullOrEmpty(AppData.State.VersionGuid))
                 SetStatus(Strings.Bootstrapper_Status_Installing);
@@ -1321,27 +1323,38 @@ namespace Bloxstrap
                 _taskbarProgressIncrement = _taskbarProgressMaximum / (double)totalPackedSize;
             }
 
-            var extractionTasks = new List<Task>();
+            var packageTasks = new List<Task>();
 
-            foreach (var package in _versionPackageManifest)
+            var ignoredPackages = App.RemoteData.Prop.IgnoredPackages.ToArray();
+
+            // from largest to smallest, this is so larger packages (which need more time) get queued first
+            var packages = _versionPackageManifest.Where(p => !ignoredPackages.Contains(p.Name)).OrderBy(p => -p.PackedSize);
+            var downloadedPackages = new List<Package>();
+
+            SetStatus(string.Format(Strings.Bootstrapper_Status_DownloadingPackages, packages.Count()));
+
+            SemaphoreSlim downloadSemaphore = new(THREAD_LIMIT);
+            foreach (var package in packages)
             {
-                if (_cancelTokenSource.IsCancellationRequested)
-                    return;
+                await downloadSemaphore.WaitAsync(_cancelTokenSource.Token);
+                
 
-                // check if the package should be ignored
-                if (App.RemoteData.Prop.IgnoredPackages.Contains(package.Name))
-                    continue;
+                var task = Task.Run(async () => {
+                    await DownloadPackage(package);
 
-                // download all the packages synchronously
-                await DownloadPackage(package);
+                    // we'll extract the runtime installer later if we need to
+                    if (package.Name != "WebView2RuntimeInstaller.zip")
+                        ExtractPackage(package);
 
-                // we'll extract the runtime installer later if we need to
-                if (package.Name == "WebView2RuntimeInstaller.zip")
-                    continue;
+                    downloadedPackages.Add(package);
+                    SetStatus(string.Format(Strings.Bootstrapper_Status_DownloadingPackages, packages.Count() - downloadedPackages.Count()));
 
-                // extract the package async immediately after download
-                extractionTasks.Add(Task.Run(() => ExtractPackage(package), _cancelTokenSource.Token));
+                    downloadSemaphore.Release();
+                }, _cancelTokenSource.Token);
+
+                packageTasks.Add(task);
             }
+            await Task.WhenAll(packageTasks);
 
             if (_cancelTokenSource.IsCancellationRequested)
                 return;
@@ -1352,11 +1365,6 @@ namespace Bloxstrap
                 Dialog.TaskbarProgressState = TaskbarItemProgressState.Indeterminate;
                 SetStatus(Strings.Bootstrapper_Status_Configuring);
             }
-
-            await Task.WhenAll(extractionTasks);
-
-            if (_cancelTokenSource.IsCancellationRequested)
-                return;
 
             if (App.State.Prop.PromptWebView2Install)
             {
@@ -1786,12 +1794,6 @@ namespace Bloxstrap
                         await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), _cancelTokenSource.Token);
 
                         _totalDownloadedBytes += bytesRead;
-                        SetStatus(
-                            String.Format(App.Settings.Prop.DownloadingStringFormat,
-                            package.Name,
-                            totalBytesRead / 1048576,
-                            package.Size / 1048576
-                            ));
                         UpdateProgressBar();
                     }
 
