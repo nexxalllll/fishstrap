@@ -128,6 +128,18 @@ namespace Bloxstrap.UI.ViewModels.Settings
             }
         }
 
+        public bool CleanerStudioCache
+        {
+            get => CleanerItems.Contains("RobloxStudioCache");
+            set
+            {
+                if (value)
+                    CleanerItems.Add("RobloxStudioCache");
+                else
+                    CleanerItems.Remove("RobloxStudioCache");
+            }
+        }
+
         public bool CleanerFishstrap
         {
             get => CleanerItems.Contains("FishstrapLogs");

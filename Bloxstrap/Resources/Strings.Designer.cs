@@ -2107,6 +2107,15 @@ namespace Bloxstrap.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to After 2 weeks.
+        /// </summary>
+        public static string Enums_CleanerOptions_TwoWeeks {
+            get {
+                return ResourceManager.GetString("Enums.CleanerOptions.TwoWeeks", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to After 2 months.
         /// </summary>
         public static string Enums_CleanerOptions_TwoMonths {
@@ -3371,6 +3380,24 @@ namespace Bloxstrap.Resources {
         public static string Menu_Bootstrapper_Cleaner_Logs_Title {
             get {
                 return ResourceManager.GetString("Menu.Bootstrapper.Cleaner.Logs.Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Old Studio downloads will be deleted..
+        /// </summary>
+        public static string Menu_Bootstrapper_Cleaner_StudioCache_Description {
+            get {
+                return ResourceManager.GetString("Menu.Bootstrapper.Cleaner.StudioCache.Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Studio Cache.
+        /// </summary>
+        public static string Menu_Bootstrapper_Cleaner_StudioCache_Title {
+            get {
+                return ResourceManager.GetString("Menu.Bootstrapper.Cleaner.StudioCache.Title", resourceCulture);
             }
         }
         

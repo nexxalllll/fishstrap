@@ -67,6 +67,11 @@
     Description="{x:Static resources:Strings.Menu_Bootstrapper_Cleaner_Cache_Description}">
                     <ui:ToggleSwitch IsChecked="{Binding CleanerCache, Mode=TwoWay}" />
                 </controls:OptionControl>
+                <controls:OptionControl
+    Header="{x:Static resources:Strings.Menu_Bootstrapper_Cleaner_StudioCache_Title}"
+    Description="{x:Static resources:Strings.Menu_Bootstrapper_Cleaner_StudioCache_Description}">
+                    <ui:ToggleSwitch IsChecked="{Binding CleanerStudioCache, Mode=TwoWay}" />
+                </controls:OptionControl>
                 <controls:OptionControl 
     Header="{x:Static resources:Strings.Menu_Bootstrapper_Cleaner_Logs_Title}" 
     Description="{x:Static resources:Strings.Menu_Bootstrapper_Cleaner_Logs_Description}">

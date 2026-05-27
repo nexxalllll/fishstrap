@@ -1423,6 +1423,9 @@ Would you like to switch your preferred channel to {0}?</value>
   <data name="Enums.CleanerOptions.OneWeek" xml:space="preserve">
     <value>After 1 week</value>
   </data>
+  <data name="Enums.CleanerOptions.TwoWeeks" xml:space="preserve">
+    <value>After 2 weeks</value>
+  </data>
   <data name="Enums.CleanerOptions.OneMonth" xml:space="preserve">
     <value>After 1 month</value>
   </data>
@@ -1440,6 +1443,12 @@ Would you like to switch your preferred channel to {0}?</value>
   </data>
   <data name="Menu.Bootstrapper.Cleaner.Cache.Description" xml:space="preserve">
     <value>Old downloads will be deleted.</value>
+  </data>
+  <data name="Menu.Bootstrapper.Cleaner.StudioCache.Title" xml:space="preserve">
+    <value>Studio Cache</value>
+  </data>
+  <data name="Menu.Bootstrapper.Cleaner.StudioCache.Description" xml:space="preserve">
+    <value>Old Studio downloads will be deleted.</value>
   </data>
   <data name="Menu.Bootstrapper.Cleaner.Logs.Title" xml:space="preserve">
     <value>Logs</value>
