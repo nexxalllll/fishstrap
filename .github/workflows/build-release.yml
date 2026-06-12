@@ -1,0 +1,53 @@
+name: Build Fishstrap
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET 6.0.428
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 6.0.428
+
+      - name: Restore
+        run: dotnet restore Fishstrap.sln
+
+      - name: Publish
+        run: dotnet publish .\Bloxstrap\Bloxstrap.csproj -c Release -r win-x64 --self-contained false -o .\publish
+
+      - name: Zip publish folder
+        shell: pwsh
+        run: Compress-Archive -Path .\publish\* -DestinationPath .\Fishstrap-custom-win-x64.zip -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fishstrap-custom-win-x64
+          path: Fishstrap-custom-win-x64.zip
+
+      - name: Upload to GitHub Release when building a tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view $env:GITHUB_REF_NAME 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:GITHUB_REF_NAME --title $env:GITHUB_REF_NAME --notes "Custom Fishstrap build"
+          }
+          gh release upload $env:GITHUB_REF_NAME .\Fishstrap-custom-win-x64.zip --clobber
