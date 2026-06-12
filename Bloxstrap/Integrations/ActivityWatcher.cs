@@ -33,6 +33,7 @@
 
         public event EventHandler<string>? OnLogEntry;
         public event EventHandler? ShowNotif;
+        public event EventHandler? OnGameJoining;
         public event EventHandler? OnGameJoin;
         public event EventHandler? OnGameLeave;
         public event EventHandler? OnLogOpen;
@@ -203,6 +204,7 @@
                     }
 
                     App.Logger.WriteLine(LOG_IDENT, $"Joining Game ({Data})");
+                    OnGameJoining?.Invoke(this, EventArgs.Empty);
                 }
             }
             else if (!InGame && Data.PlaceId != 0)

@@ -62,5 +62,11 @@ namespace Bloxstrap.Models.Persistable
 
         // mod preset configuration
         public bool UseDisableAppPatch { get; set; } = false;
+
+        // Optional allow-list and deny-list for the custom font mod.
+        // No included PlaceIds = apply globally, except for excluded PlaceIds.
+        // Included PlaceIds = apply only to those PlaceIds. Exclusions always win.
+        public List<long> CustomFontPlaceIds { get; set; } = new();
+        public List<long> CustomFontExcludedPlaceIds { get; set; } = new();
     }
 }

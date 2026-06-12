@@ -2,17 +2,18 @@
 {
     public enum BootstrapperStyle
     {
-        VistaDialog,
-        LegacyDialog2008,
-        LegacyDialog2011,
-        ProgressDialog,
-        ClassicFluentDialog,
-        TwentyFiveDialog,
-        TerminalDialog,
-        ByfronDialog,
+        // These values are persisted in Settings.json. Keep existing values stable.
+        VistaDialog = 0,
+        LegacyDialog2008 = 1,
+        LegacyDialog2011 = 2,
+        ProgressDialog = 3,
+        ClassicFluentDialog = 4,
+        TwentyFiveDialog = 5,
+        ByfronDialog = 6,
         [EnumName(StaticName = "Fishstrap")]
-        FluentDialog,
-        FluentAeroDialog,
-        CustomDialog
+        FluentDialog = 7,
+        FluentAeroDialog = 8,
+        CustomDialog = 9,
+        TerminalDialog = 10
     }
 }

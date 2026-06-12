@@ -17,6 +17,8 @@ namespace Bloxstrap
 
         public readonly DiscordRichPresence? RichPresence;
 
+        private readonly CustomFontInAppRelauncher? _customFontInAppRelauncher;
+
         public Watcher()
         {
             const string LOG_IDENT = "Watcher";
@@ -57,9 +59,15 @@ namespace Bloxstrap
 
             WindowManipulation = new(_watcherData.Handle, _watcherData.ProcessId);
 
-            if (App.Settings.Prop.EnableActivityTracking)
+            if (App.Settings.Prop.EnableActivityTracking || _watcherData.EnableInAppCustomFontRelaunch)
             {
                 ActivityWatcher = new(_watcherData.LogFile);
+
+                if (_watcherData.EnableInAppCustomFontRelaunch)
+                {
+                    _customFontInAppRelauncher = new(_watcherData.ProcessId, _watcherData.CustomFontActiveForLaunch);
+                    ActivityWatcher.OnGameJoining += (_, _) => _customFontInAppRelauncher.HandleGameJoining(ActivityWatcher.Data);
+                }
 
                 if (App.Settings.Prop.UseDisableAppPatch)
                 {
@@ -124,6 +132,9 @@ namespace Bloxstrap
 
             while (Utilities.GetProcessesSafe().Any(x => x.Id == _watcherData.ProcessId))
                 await Task.Delay(1000);
+
+            if (_customFontInAppRelauncher is not null)
+                await _customFontInAppRelauncher.WaitForRelaunchAsync();
 
             if (_watcherData.AutoclosePids is not null)
             {

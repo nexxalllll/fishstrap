@@ -65,6 +65,41 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand ManageCustomFontCommand => new RelayCommand(ManageCustomFont);
 
+        public string CustomFontPlaceIdsText
+        {
+            get => String.Join(
+                Environment.NewLine,
+                App.Settings.Prop.CustomFontPlaceIds
+                    .Select(placeId => placeId.ToString())
+                    .Concat(App.Settings.Prop.CustomFontExcludedPlaceIds.Select(placeId => $"!{placeId}"))
+            );
+            set
+            {
+                var includedPlaceIds = new List<long>();
+                var excludedPlaceIds = new List<long>();
+
+                foreach (Match match in Regex.Matches(value ?? String.Empty, @"!?\d+"))
+                {
+                    bool excluded = match.Value.StartsWith('!');
+                    string placeIdText = excluded ? match.Value[1..] : match.Value;
+
+                    if (!long.TryParse(placeIdText, out long placeId) || placeId <= 0)
+                        continue;
+
+                    if (excluded)
+                        excludedPlaceIds.Add(placeId);
+                    else
+                        includedPlaceIds.Add(placeId);
+                }
+
+                App.Settings.Prop.CustomFontExcludedPlaceIds = excludedPlaceIds.Distinct().ToList();
+                App.Settings.Prop.CustomFontPlaceIds = includedPlaceIds
+                    .Where(placeId => !App.Settings.Prop.CustomFontExcludedPlaceIds.Contains(placeId))
+                    .Distinct()
+                    .ToList();
+            }
+        }
+
         public ICommand OpenCompatSettingsCommand => new RelayCommand(OpenCompatSettings);
 
         public ModPresetTask OldAvatarBackgroundTask { get; } = new("OldAvatarBackground", @"ExtraContent\places\Mobile.rbxl", "OldAvatarBackground.rbxl");

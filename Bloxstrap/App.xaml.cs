@@ -25,6 +25,8 @@ namespace Bloxstrap
         public const string ProjectSupportLink = "https://github.com/returnrqt/fishstrap/issues/new";
         public const string ProjectRemoteDataLink = "https://config.fishstrap.app/v1/Data.json";
 
+        public const bool IsCustomBuild = true;
+
         public const string RobloxPlayerAppName = "RobloxPlayerBeta.exe";
         public const string RobloxStudioAppName = "RobloxStudioBeta.exe";
 

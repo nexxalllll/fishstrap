@@ -59,6 +59,7 @@ namespace Bloxstrap
         public static bool _staticDirectory => App.Settings.Prop.StaticDirectory;
 
         private bool _isInstalling = false;
+        private bool _customFontActiveForLaunch = false;
         private double _progressIncrement;
         private double _taskbarProgressIncrement;
         private double _taskbarProgressMaximum;
@@ -205,7 +206,11 @@ namespace Bloxstrap
                 HandleConnectionError(connectionResult);
 
 #if (!DEBUG || DEBUG_UPDATER) && !QA_BUILD
-            if (App.Settings.Prop.CheckForUpdates && !App.LaunchSettings.UpgradeFlag.Active)
+            if (App.IsCustomBuild && App.Settings.Prop.CheckForUpdates)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Skipping application update check for custom build");
+            }
+            else if (App.Settings.Prop.CheckForUpdates && !App.LaunchSettings.UpgradeFlag.Active)
             {
                 bool updatePresent = await CheckForUpdates();
                 
@@ -935,7 +940,12 @@ namespace Bloxstrap
                     autoclosePids.Add(pid);
             }
 
-            if (App.Settings.Prop.EnableActivityTracking || App.LaunchSettings.TestModeFlag.Active || autoclosePids.Any())
+            bool enableInAppCustomFontRelaunch =
+                _launchMode == LaunchMode.Player &&
+                CustomFontRules.HasRules &&
+                File.Exists(Paths.CustomFont);
+
+            if (App.Settings.Prop.EnableActivityTracking || App.LaunchSettings.TestModeFlag.Active || autoclosePids.Any() || enableInAppCustomFontRelaunch)
             {
                 using var ipl = new InterProcessLock("Watcher", TimeSpan.FromSeconds(5));
 
@@ -944,7 +954,9 @@ namespace Bloxstrap
                     ProcessId = _appPid,
                     LogFile = logFileName,
                     AutoclosePids = autoclosePids,
-                    Handle = _appWindowHandle.ToInt64()
+                    Handle = _appWindowHandle.ToInt64(),
+                    EnableInAppCustomFontRelaunch = enableInAppCustomFontRelaunch,
+                    CustomFontActiveForLaunch = _customFontActiveForLaunch
                 };
 
                 string watcherDataArg = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(watcherData)));
@@ -1497,6 +1509,54 @@ namespace Bloxstrap
             Process.Start(Paths.Process, "-backgroundupdater");
         }
 
+        private long? GetLaunchPlaceIdForCustomFont()
+        {
+            if (_launchMode != LaunchMode.Player || String.IsNullOrEmpty(_launchCommandLine))
+                return null;
+
+            var joinData = new GameJoin().GetJoinDataByLaunchCommand(_launchCommandLine);
+
+            if (joinData.PlaceId is not null)
+                return joinData.PlaceId;
+
+            // Fallback for launch formats GameJoin does not currently understand,
+            // such as roblox://experiences/start?placeId=123.
+            string decodedLaunchCommand = WebUtility.UrlDecode(_launchCommandLine);
+            Match placeIdMatch = Regex.Match(decodedLaunchCommand, @"placeId=([0-9]+)", RegexOptions.IgnoreCase);
+
+            if (!placeIdMatch.Success)
+                return null;
+
+            return long.TryParse(placeIdMatch.Groups[1].Value, out long placeId) ? placeId : (long?)null;
+        }
+
+        private bool ShouldApplyCustomFontForLaunch()
+        {
+            const string LOG_IDENT = "Bootstrapper::ShouldApplyCustomFontForLaunch";
+
+            if (!File.Exists(Paths.CustomFont))
+                return false;
+
+            if (!CustomFontRules.HasRules)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "No custom font PlaceId rules set; applying custom font globally");
+                return true;
+            }
+
+            long? placeId = GetLaunchPlaceIdForCustomFont();
+
+            if (placeId is null)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Current launch PlaceId could not be detected; starting with normal font and reopening in-app joins when needed");
+                return false;
+            }
+
+            bool shouldApply = CustomFontRules.ShouldApply(placeId);
+            App.Logger.WriteLine(LOG_IDENT, $"Launch PlaceId is {placeId}; custom font enabled for this launch: {shouldApply}");
+
+            return shouldApply;
+        }
+
         private async Task<bool> ApplyModifications()
         {
             const string LOG_IDENT = "Bootstrapper::ApplyModifications";
@@ -1519,8 +1579,9 @@ namespace Bloxstrap
             // instead of replacing the fonts themselves, we'll just alter the font family manifests
 
             string modFontFamiliesFolder = Path.Combine(Paths.Modifications, "content\\fonts\\families");
+            _customFontActiveForLaunch = ShouldApplyCustomFontForLaunch();
 
-            if (File.Exists(Paths.CustomFont))
+            if (_customFontActiveForLaunch)
             {
                 App.Logger.WriteLine(LOG_IDENT, "Begin font check");
 
@@ -1570,9 +1631,12 @@ namespace Bloxstrap
 
                 App.Logger.WriteLine(LOG_IDENT, "End font check");
             }
-            else if (Directory.Exists(modFontFamiliesFolder))
+            else
             {
-                Directory.Delete(modFontFamiliesFolder, true);
+                if (Directory.Exists(modFontFamiliesFolder))
+                    Directory.Delete(modFontFamiliesFolder, true);
+
+                new CustomFontVersionRestorer(_latestVersionDirectory).RestoreNormalFont();
             }
 
             // we apply it here since RobloxDomain could be changed by the user
@@ -1592,6 +1656,14 @@ namespace Bloxstrap
                 if (relativeFile == "README.txt")
                 {
                     File.Delete(file);
+                    continue;
+                }
+
+                if (!_customFontActiveForLaunch &&
+                    (String.Equals(relativeFile, "content\\fonts\\CustomFont.ttf", StringComparison.OrdinalIgnoreCase) ||
+                     relativeFile.StartsWith("content\\fonts\\families\\", StringComparison.OrdinalIgnoreCase)))
+                {
+                    App.Logger.WriteLine(LOG_IDENT, $"Skipping inactive custom font mod: {relativeFile}");
                     continue;
                 }
 
