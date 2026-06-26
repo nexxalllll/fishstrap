@@ -67,7 +67,7 @@
                     </Style.Triggers>
                 </Style>
             </StackPanel.Style>
-            <ui:InfoBar Margin="0,0,0,8" Padding="8" Title="meow" Message="This feature requires activity tracking" Severity="Informational" IsOpen="True" IsClosable="False" />
+            <ui:InfoBar Margin="0,8,0,8" Padding="8" Title="{x:Static resources:Strings.Common_NotAvailable}" Message="{x:Static resources:Strings.Menu_Appearance_WindowManipulationAlert}" Severity="Informational" IsOpen="True" IsClosable="False" />
         </StackPanel>
 
         <StackPanel IsEnabled="{Binding WindowManipulationEnabled, Mode=OneWay}">

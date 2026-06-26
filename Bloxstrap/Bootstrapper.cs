@@ -64,6 +64,7 @@ namespace Bloxstrap
         private double _taskbarProgressIncrement;
         private double _taskbarProgressMaximum;
         private long _totalDownloadedBytes = 0;
+        private long _totalPackagedBytes = 0;
         private bool _packageExtractionSuccess = true;
 
         private bool _mustUpgrade => App.LaunchSettings.ForceFlag.Active || App.State.Prop.ForceReinstall || String.IsNullOrEmpty(AppData.State.VersionGuid) || !File.Exists(AppData.ExecutablePath);
@@ -136,6 +137,13 @@ namespace Bloxstrap
         {
             if (Dialog is null)
                 return;
+
+            // update the download status
+            SetStatus(string.Format(
+                Strings.Bootstrapper_Status_DownloadingPackages,
+                FileSize.ByteSize(_totalDownloadedBytes),
+                FileSize.ByteSize(_totalPackagedBytes)
+                ));
 
             // UI progress
             int progressValue = (int)Math.Floor(_progressIncrement * _totalDownloadedBytes);
@@ -567,6 +575,12 @@ namespace Bloxstrap
                 return false;
             }
 
+            if (!string.IsNullOrEmpty(Deployment.ChannelToken))
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Not eligible: Private channel enrollment");
+                return false;
+            }
+
             // at least 3GB of free space
             const long minimumFreeSpace = 3_000_000_000;
             long space = Filesystem.GetFreeDiskSpace(Paths.Base);
@@ -610,26 +624,6 @@ namespace Bloxstrap
                 App.Logger.WriteLine(LOG_IDENT, $"Not eligible: Major version diff is {diff}");
                 return false;
             }
-        }
-
-        private static void LaunchMultiInstanceWatcher()
-        {
-            const string LOG_IDENT = "Bootstrapper::LaunchMultiInstanceWatcher";
-
-            if (Utilities.DoesMutexExist("ROBLOX_singletonMutex"))
-            {
-                App.Logger.WriteLine(LOG_IDENT, "Roblox singleton mutex already exists");
-                return;
-            }
-
-            using EventWaitHandle initEventHandle = new EventWaitHandle(false, EventResetMode.AutoReset, "Bloxstrap-MultiInstanceWatcherInitialisationFinished");
-            Process.Start(Paths.Process, "-multiinstancewatcher");
-
-            bool initSuccess = initEventHandle.WaitOne(TimeSpan.FromSeconds(2));
-            if (initSuccess)
-                App.Logger.WriteLine(LOG_IDENT, "Initialisation finished signalled, continuing.");
-            else
-                App.Logger.WriteLine(LOG_IDENT, "Did not receive the initialisation finished signal, continuing.");
         }
 
         private double Deg2Rad(double deg)
@@ -762,10 +756,6 @@ namespace Bloxstrap
                         ex
                         );
                 }
-
-                // this needs to be done before roblox launches
-                if (App.Settings.Prop.MultiInstanceLaunching)
-                    LaunchMultiInstanceWatcher();
 
                 if (App.Settings.Prop.ForceRobloxLanguage)
                 {
@@ -945,7 +935,7 @@ namespace Bloxstrap
                 CustomFontRules.HasRules &&
                 File.Exists(Paths.CustomFont);
 
-            if (App.Settings.Prop.EnableActivityTracking || App.LaunchSettings.TestModeFlag.Active || autoclosePids.Any() || enableInAppCustomFontRelaunch)
+            if (App.Settings.Prop.EnableActivityTracking || App.Settings.Prop.EnableWindowManipulation || App.LaunchSettings.TestModeFlag.Active || autoclosePids.Any() || enableInAppCustomFontRelaunch)
             {
                 using var ipl = new InterProcessLock("Watcher", TimeSpan.FromSeconds(5));
 
@@ -1324,15 +1314,15 @@ namespace Bloxstrap
                 Dialog.ProgressMaximum = ProgressBarMaximum;
 
                 // compute total bytes to download
-                int totalPackedSize = _versionPackageManifest.Sum(package => package.PackedSize);
-                _progressIncrement = (double)ProgressBarMaximum / totalPackedSize;
+                _totalPackagedBytes = _versionPackageManifest.Sum(package => package.PackedSize);
+                _progressIncrement = (double)ProgressBarMaximum / _totalPackagedBytes;
 
                 if (Dialog is WinFormsDialogBase)
                     _taskbarProgressMaximum = (double)TaskbarProgressMaximumWinForms;
                 else
                     _taskbarProgressMaximum = (double)TaskbarProgressMaximumWpf;
 
-                _taskbarProgressIncrement = _taskbarProgressMaximum / (double)totalPackedSize;
+                _taskbarProgressIncrement = _taskbarProgressMaximum / (double)_totalPackagedBytes;
             }
 
             var packageTasks = new List<Task>();
@@ -1341,9 +1331,6 @@ namespace Bloxstrap
 
             // from largest to smallest, this is so larger packages (which need more time) get queued first
             var packages = _versionPackageManifest.Where(p => !ignoredPackages.Contains(p.Name)).OrderBy(p => -p.PackedSize);
-            var downloadedPackages = new List<Package>();
-
-            SetStatus(string.Format(Strings.Bootstrapper_Status_DownloadingPackages, packages.Count()));
 
             SemaphoreSlim downloadSemaphore = new(THREAD_LIMIT);
             foreach (var package in packages)
@@ -1357,9 +1344,6 @@ namespace Bloxstrap
                     // we'll extract the runtime installer later if we need to
                     if (package.Name != "WebView2RuntimeInstaller.zip")
                         ExtractPackage(package);
-
-                    downloadedPackages.Add(package);
-                    SetStatus(string.Format(Strings.Bootstrapper_Status_DownloadingPackages, packages.Count() - downloadedPackages.Count()));
 
                     downloadSemaphore.Release();
                 }, _cancelTokenSource.Token);
@@ -1642,7 +1626,14 @@ namespace Bloxstrap
             // we apply it here since RobloxDomain could be changed by the user
             App.Logger.WriteLine(LOG_IDENT, "Writing AppSettings.xml...");
             if (!File.Exists(Paths.Modifications + "\\AppSettings.xml"))
-                await File.WriteAllTextAsync(Path.Combine(_latestVersionDirectory, "AppSettings.xml"), AppSettings.Replace("roblox.com", Deployment.RobloxDomain));
+            {
+                Directory.CreateDirectory(_latestVersionDirectory);
+
+                await File.WriteAllTextAsync(
+                    Path.Combine(_latestVersionDirectory, "AppSettings.xml"),
+                    AppSettings.Replace("roblox.com", Deployment.RobloxDomain)
+                );
+            }
 
             foreach (string file in Directory.GetFiles(Paths.Modifications, "*.*", SearchOption.AllDirectories))
             {
@@ -1673,7 +1664,9 @@ namespace Bloxstrap
                 if (relativeFile.EndsWith(".lock"))
                     continue;
 
-                if (relativeFile.EndsWith(".mesh"))
+                bool isBlacklisted = relativeFile.Contains("content\\avatar\\heads") || relativeFile.Contains("content\\avatar\\compositing") || relativeFile.Contains("content\\avatar\\meshes");
+
+                if (relativeFile.EndsWith(".mesh") && isBlacklisted)
                 {
                     App.Logger.WriteLine(LOG_IDENT, $"Skipping file: {relativeFile}");
                     continue;

@@ -27,7 +27,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ICommand EditCustomThemeCommand => new RelayCommand(EditCustomTheme);
         public ICommand ExportCustomThemeCommand => new RelayCommand(ExportCustomTheme);
 
-        public bool WindowManipulationEnabled => WindowManipulation.WindowManipulationAvailable;
+        public bool WindowManipulationEnabled => App.Settings.Prop.EnableWindowManipulation;
 
         public void OnNavigatedTo() => OnPropertyChanged(nameof(WindowManipulationEnabled));
 

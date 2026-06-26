@@ -1431,7 +1431,8 @@ Ustawiono domyślnie do {1}.</value>
   <data name="Bootstrapper.ExtractionFailed.Message" xml:space="preserve">
     <value>Może brakować niektórych treści. Zmuś ponowną instalację Roblox w ustawieniach, aby to naprawić.</value>
   </data>
-  <data name="Menu.Integrations.MultiInstanceLaunching.Title" xml:space="preserve">
+  <data name="Menu.Integrations.
+		Launching.Title" xml:space="preserve">
     <value>Zezwól na uruchamianie wielu instancji</value>
   </data>
   <data name="Menu.Integrations.MultiInstanceLaunching.Description" xml:space="preserve">

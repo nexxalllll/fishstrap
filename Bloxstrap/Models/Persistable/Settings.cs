@@ -24,7 +24,6 @@ namespace Bloxstrap.Models.Persistable
         public byte AcrylicBackgroundOpacity { get; set; } = 165;
         public bool ForceLocalData { get; set; } = false;
         public bool CheckForUpdates { get; set; } = true;
-        public bool MultiInstanceLaunching { get; set; } = false;
         public bool ConfirmLaunches { get; set; } = true;
         public string Locale { get; set; } = "nil";
         public bool ForceRobloxLanguage { get; set; } = false;
@@ -51,6 +50,7 @@ namespace Bloxstrap.Models.Persistable
             "RobloxLogs",
             "FishstrapLogs"
         };
+        public bool EnableWindowManipulation { get; set; } = false;
         public bool FakeBorderlessFullscreen { get; set; } = false;
         public bool EnableActivityTracking { get; set; } = true;
         public bool UseDiscordRichPresence { get; set; } = true;

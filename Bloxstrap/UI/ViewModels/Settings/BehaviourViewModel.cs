@@ -1,12 +1,6 @@
-﻿using Bloxstrap.AppData;
-using Bloxstrap.Enums;
-using Bloxstrap.Integrations;
-using Bloxstrap.RobloxInterfaces;
-using Wpf.Ui.Common.Interfaces;
-
-namespace Bloxstrap.UI.ViewModels.Settings
+﻿namespace Bloxstrap.UI.ViewModels.Settings
 {
-    public class BehaviourViewModel : NotifyPropertyChangedViewModel, INavigationAware
+    public class BehaviourViewModel : NotifyPropertyChangedViewModel
     {
 
         public BehaviourViewModel()
@@ -14,16 +8,7 @@ namespace Bloxstrap.UI.ViewModels.Settings
             App.Cookies.StateChanged += (object? _, CookieState state) => CookieLoadingFailed = state != CookieState.Success && state != CookieState.Unknown;
         }
 
-        public void OnNavigatedTo() 
-        {
-            OnPropertyChanged(nameof(VulkanFullscreenAllowed));
-            OnPropertyChanged(nameof(EnableFakeBorderlessFullscreen));
-        }
-
-        public void OnNavigatedFrom() { } // has to be here because of INavigationAware, we will just leave it empty
-
         public bool IsRobloxInstallationMissing => String.IsNullOrEmpty(App.RobloxState.Prop.Player.VersionGuid) && String.IsNullOrEmpty(App.RobloxState.Prop.Studio.VersionGuid);
-        public bool VulkanFullscreenAllowed => WindowManipulation.WindowManipulationAvailable && (App.FastFlags.GetPreset("Rendering.Mode.Vulkan") ?? "False").Equals("True", StringComparison.OrdinalIgnoreCase);
 
         public bool CookieAccess
         {
@@ -60,11 +45,6 @@ namespace Bloxstrap.UI.ViewModels.Settings
         {
             get => App.Settings.Prop.EnableBetterMatchmakingRandomization;
             set => App.Settings.Prop.EnableBetterMatchmakingRandomization = value;
-        }
-        public bool EnableFakeBorderlessFullscreen
-        {
-            get => App.Settings.Prop.FakeBorderlessFullscreen;
-            set => App.Settings.Prop.FakeBorderlessFullscreen = value;
         }
 
         public bool ConfirmLaunches

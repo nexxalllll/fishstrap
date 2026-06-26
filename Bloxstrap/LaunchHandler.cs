@@ -59,11 +59,6 @@ namespace Bloxstrap
                 App.Logger.WriteLine(LOG_IDENT, "Opening watcher");
                 LaunchWatcher();
             }
-            else if (App.LaunchSettings.MultiInstanceWatcherFlag.Active)
-            {
-                App.Logger.WriteLine(LOG_IDENT, "Opening multi-instance watcher");
-                LaunchMultiInstanceWatcher();
-            }
             else if (App.LaunchSettings.BackgroundUpdaterFlag.Active)
             {
                 App.Logger.WriteLine(LOG_IDENT, "Opening background updater");
@@ -233,7 +228,7 @@ namespace Bloxstrap
                 App.Terminate(ErrorCode.ERROR_FILE_NOT_FOUND);
             }
 
-            if (App.Settings.Prop.ConfirmLaunches && Utilities.IsRobloxRunning() && !App.Settings.Prop.MultiInstanceLaunching && launchMode != LaunchMode.Studio)
+            if (App.Settings.Prop.ConfirmLaunches && Utilities.IsRobloxRunning() && launchMode != LaunchMode.Studio)
             {
                 // this currently doesn't work very well since it relies on checking the existence of the singleton mutex
                 // which often hangs around for a few seconds after the window closes
@@ -316,27 +311,6 @@ namespace Bloxstrap
             });
         }
 
-        public static void LaunchMultiInstanceWatcher()
-        {
-            const string LOG_IDENT = "LaunchHandler::LaunchMultiInstanceWatcher";
-
-            App.Logger.WriteLine(LOG_IDENT, "Starting multi-instance watcher");
-
-            Task.Run(MultiInstanceWatcher.Run).ContinueWith(t =>
-            {
-                App.Logger.WriteLine(LOG_IDENT, "Multi instance watcher task has finished");
-
-                if (t.IsFaulted)
-                {
-                    App.Logger.WriteLine(LOG_IDENT, "An exception occurred when running the multi-instance watcher");
-
-                    if (t.Exception is not null)
-                        App.FinalizeExceptionHandling(t.Exception);
-                }
-
-                App.Terminate();
-            });
-        }
         public static void LaunchBloxshadeConfig()
         {
             const string LOG_IDENT = "LaunchHandler::LaunchBloxshade";
