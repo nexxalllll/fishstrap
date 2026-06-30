@@ -63,6 +63,11 @@ namespace Bloxstrap.Models.Persistable
         // mod preset configuration
         public bool UseDisableAppPatch { get; set; } = false;
 
+        public bool EnableAvatarPresetSwitcher { get; set; } = false;
+        public long DefaultAvatarOutfitId { get; set; } = 0;
+        public bool RestoreAvatarPresetOnLeave { get; set; } = true;
+        public ObservableCollection<AvatarPresetRule> AvatarPresetRules { get; set; } = new();
+
         // Optional allow-list and deny-list for the custom font mod.
         // No included PlaceIds = apply globally, except for excluded PlaceIds.
         // Included PlaceIds = apply only to those PlaceIds. Exclusions always win.

@@ -10,6 +10,7 @@ namespace Bloxstrap
 {
     public class CookiesManager
     {
+        private readonly SemaphoreSlim _loadSemaphore = new(1, 1);
         private CookieState _state = CookieState.Unknown;
 
         public EventHandler<CookieState>? StateChanged;
@@ -29,6 +30,38 @@ namespace Bloxstrap
         private const string AuthPattern = $@"\t{AuthCookieName}\t(.+?)(;|$)";
         private string CookiesPath => Path.Combine(Paths.Roblox, "LocalStorage", Deployment.IsDefaultRobloxDomain ? "RobloxCookies.dat" : $"{Deployment.RobloxDomain}_RobloxCookies.dat");
 
+        private async Task<HttpRequestMessage> BuildAuthenticatedRequest(HttpRequestMessage request, string? csrfToken = null)
+        {
+            var authenticatedRequest = new HttpRequestMessage(request.Method, request.RequestUri)
+            {
+                Version = request.Version
+            };
+
+            foreach (var header in request.Headers)
+                authenticatedRequest.Headers.TryAddWithoutValidation(header.Key, header.Value);
+
+            authenticatedRequest.Headers.Remove("Cookie");
+            authenticatedRequest.Headers.Add("Cookie", $".ROBLOSECURITY={AuthCookie}");
+
+            if (!String.IsNullOrEmpty(csrfToken))
+            {
+                authenticatedRequest.Headers.Remove("x-csrf-token");
+                authenticatedRequest.Headers.Add("x-csrf-token", csrfToken);
+            }
+
+            if (request.Content is not null)
+            {
+                var content = new ByteArrayContent(await request.Content.ReadAsByteArrayAsync());
+
+                foreach (var header in request.Content.Headers)
+                    content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+
+                authenticatedRequest.Content = content;
+            }
+
+            return authenticatedRequest;
+        }
+
         public async Task<HttpResponseMessage> AuthRequest(HttpRequestMessage request)
         {
             string? host = request.RequestUri?.Host;
@@ -46,8 +79,21 @@ namespace Bloxstrap
             if (!Enabled)
                 throw new NullReferenceException("Cookie access is not enabled");
 
-            request.Headers.Add("Cookie", $".ROBLOSECURITY={AuthCookie}");
-            var response = await App.HttpClient.SendAsync(request);
+            var response = await App.HttpClient.SendAsync(await BuildAuthenticatedRequest(request));
+
+            if (
+                response.StatusCode == HttpStatusCode.Forbidden &&
+                response.Headers.TryGetValues("x-csrf-token", out var csrfTokens)
+            )
+            {
+                string? csrfToken = csrfTokens.FirstOrDefault();
+
+                if (!String.IsNullOrEmpty(csrfToken))
+                {
+                    response.Dispose();
+                    response = await App.HttpClient.SendAsync(await BuildAuthenticatedRequest(request, csrfToken));
+                }
+            }
 
             return response;
         }
@@ -83,74 +129,89 @@ namespace Bloxstrap
         {
             const string LOG_IDENT = "CookiesManager::LoadCookies";
 
-            // we use the status to infrom user about it in the menu
-            if (!Enabled)
-            {
-                State = CookieState.NotAllowed;
-                App.Logger.WriteLine(LOG_IDENT, "Cookie access not allowed");
-                return;
-            }
-
-            if (!string.IsNullOrEmpty(AuthCookie))
-            {
-                App.Logger.WriteLine(LOG_IDENT, "Cookie was already loaded!");
-                return;
-            }
-
-            if (!File.Exists(CookiesPath))
-            {
-                State = CookieState.NotFound;
-                App.Logger.WriteLine(LOG_IDENT, "Cookie file not found");
-                return;
-            }
+            await _loadSemaphore.WaitAsync();
 
             try
             {
-                string content = File.ReadAllText(CookiesPath);
-                var cookies = JsonSerializer.Deserialize<RobloxCookies>(content)!;
-
-                if (cookies.Version != SupportedVersion)
-                    App.Logger.WriteLine(LOG_IDENT, $"Unknown cookie version: {cookies.Version}");
-
-                // here we got the raw bytes data which we have to decrypt with user scope
-                // from that we get raw cookies data in roblox's format
-                // in our case we will regex it since all we need is auth cookie
-                byte[] encryptedData = Convert.FromBase64String(cookies.Cookies);
-                byte[] unencryptedData = ProtectedData.Unprotect(encryptedData, null, DataProtectionScope.CurrentUser);
-
-                string rawCookies = Encoding.UTF8.GetString(unencryptedData);
-                Match authCookieMatch = Regex.Match(rawCookies, AuthPattern);
-
-                if (!authCookieMatch.Success)
+                // we use the status to infrom user about it in the menu
+                if (!Enabled)
                 {
-                    State = CookieState.Invalid;
-                    App.Logger.WriteLine(LOG_IDENT, "Regex failed for cookies");
+                    State = CookieState.NotAllowed;
+                    App.Logger.WriteLine(LOG_IDENT, "Cookie access not allowed");
                     return;
                 }
 
-                string authCookie = authCookieMatch.Groups[1].Value;
-                AuthCookie = authCookie; // could use better naming
-
-                // we test the cookie to see if its valid
-                AuthenticatedUser? user = await GetAuthenticated();
-                if (user is null || user?.Id == 0)
+                if (!string.IsNullOrEmpty(AuthCookie))
                 {
-                    State = CookieState.Invalid;
-                    App.Logger.WriteLine(LOG_IDENT, "Cookie is invalid");
+                    App.Logger.WriteLine(LOG_IDENT, "Cookie was already loaded!");
                     return;
                 }
 
-                State = CookieState.Success;
+                if (!File.Exists(CookiesPath))
+                {
+                    State = CookieState.NotFound;
+                    App.Logger.WriteLine(LOG_IDENT, "Cookie file not found");
+                    return;
+                }
+
+                try
+                {
+                    string content = File.ReadAllText(CookiesPath);
+                    var cookies = JsonSerializer.Deserialize<RobloxCookies>(content)!;
+
+                    if (cookies.Version != SupportedVersion)
+                        App.Logger.WriteLine(LOG_IDENT, $"Unknown cookie version: {cookies.Version}");
+
+                    // here we got the raw bytes data which we have to decrypt with user scope
+                    // from that we get raw cookies data in roblox's format
+                    // in our case we will regex it since all we need is auth cookie
+                    byte[] encryptedData = Convert.FromBase64String(cookies.Cookies);
+                    byte[] unencryptedData = ProtectedData.Unprotect(encryptedData, null, DataProtectionScope.CurrentUser);
+
+                    string rawCookies = Encoding.UTF8.GetString(unencryptedData);
+                    Match authCookieMatch = Regex.Match(rawCookies, AuthPattern);
+
+                    if (!authCookieMatch.Success)
+                    {
+                        State = CookieState.Invalid;
+                        App.Logger.WriteLine(LOG_IDENT, "Regex failed for cookies");
+                        return;
+                    }
+
+                    string authCookie = authCookieMatch.Groups[1].Value;
+                    AuthCookie = authCookie; // could use better naming
+
+                    // we test the cookie to see if its valid
+                    AuthenticatedUser? user = await GetAuthenticated();
+                    if (user is null || user?.Id == 0)
+                    {
+                        State = CookieState.Invalid;
+                        App.Logger.WriteLine(LOG_IDENT, "Cookie is invalid");
+                        return;
+                    }
+
+                    State = CookieState.Success;
+                }
+                catch (Exception ex)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Failed to load cookie!");
+                    App.Logger.WriteException(LOG_IDENT, ex);
+
+                    State = CookieState.Failed;
+                }
             }
-            catch (Exception ex)
+            finally
             {
-                App.Logger.WriteLine(LOG_IDENT, "Failed to load cookie!");
-                App.Logger.WriteException(LOG_IDENT, ex); 
-
-                State = CookieState.Failed;
+                _loadSemaphore.Release();
             }
+        }
 
-            return;
+        public async Task EnsureLoadedAsync()
+        {
+            if (Loaded || State == CookieState.NotAllowed)
+                return;
+
+            await LoadCookies();
         }
     }
 }

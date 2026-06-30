@@ -710,6 +710,8 @@ namespace Bloxstrap
 
             SetStatus(Strings.Bootstrapper_Status_Starting);
 
+            AvatarPresetApplyResult? avatarPresetApplyResult = null;
+
             if (_launchMode == LaunchMode.Player)
             {
                 GameJoin gameJoin = new();
@@ -770,6 +772,12 @@ namespace Bloxstrap
 
                 if (!Deployment.IsDefaultRobloxDomain && string.IsNullOrEmpty(_launchCommandLine))
                     _launchCommandLine = "roblox://navigation/home"; // fixes a bug on rblx.org where its stuck on the login screen, doesnt affect anything else
+
+                if (AvatarPresetRules.HasRules)
+                {
+                    long? placeId = GetLaunchPlaceId();
+                    avatarPresetApplyResult = await new AvatarPresetSwitcher().ApplyForPlace(placeId, placeId is null ? "player launch" : $"launch PlaceId {placeId}");
+                }
             }
 
             var startInfo = new ProcessStartInfo()
@@ -935,7 +943,11 @@ namespace Bloxstrap
                 CustomFontRules.HasRules &&
                 File.Exists(Paths.CustomFont);
 
-            if (App.Settings.Prop.EnableActivityTracking || App.Settings.Prop.EnableWindowManipulation || App.LaunchSettings.TestModeFlag.Active || autoclosePids.Any() || enableInAppCustomFontRelaunch)
+            bool enableAvatarPresetWatcher =
+                _launchMode == LaunchMode.Player &&
+                AvatarPresetRules.HasRules;
+
+            if (App.Settings.Prop.EnableActivityTracking || App.Settings.Prop.EnableWindowManipulation || App.LaunchSettings.TestModeFlag.Active || autoclosePids.Any() || enableInAppCustomFontRelaunch || enableAvatarPresetWatcher)
             {
                 using var ipl = new InterProcessLock("Watcher", TimeSpan.FromSeconds(5));
 
@@ -946,7 +958,9 @@ namespace Bloxstrap
                     AutoclosePids = autoclosePids,
                     Handle = _appWindowHandle.ToInt64(),
                     EnableInAppCustomFontRelaunch = enableInAppCustomFontRelaunch,
-                    CustomFontActiveForLaunch = _customFontActiveForLaunch
+                    CustomFontActiveForLaunch = _customFontActiveForLaunch,
+                    EnableAvatarPresetWatcher = enableAvatarPresetWatcher,
+                    AvatarPresetAppliedOutfitId = avatarPresetApplyResult?.AppliedOutfitId ?? 0
                 };
 
                 string watcherDataArg = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(watcherData)));
@@ -1493,7 +1507,7 @@ namespace Bloxstrap
             Process.Start(Paths.Process, "-backgroundupdater");
         }
 
-        private long? GetLaunchPlaceIdForCustomFont()
+        private long? GetLaunchPlaceId()
         {
             if (_launchMode != LaunchMode.Player || String.IsNullOrEmpty(_launchCommandLine))
                 return null;
@@ -1527,7 +1541,7 @@ namespace Bloxstrap
                 return true;
             }
 
-            long? placeId = GetLaunchPlaceIdForCustomFont();
+            long? placeId = GetLaunchPlaceId();
 
             if (placeId is null)
             {

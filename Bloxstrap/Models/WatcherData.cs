@@ -13,5 +13,9 @@
         public bool EnableInAppCustomFontRelaunch { get; set; }
 
         public bool CustomFontActiveForLaunch { get; set; }
+
+        public bool EnableAvatarPresetWatcher { get; set; }
+
+        public long AvatarPresetAppliedOutfitId { get; set; }
     }
 }

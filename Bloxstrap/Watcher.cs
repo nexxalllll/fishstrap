@@ -19,6 +19,8 @@ namespace Bloxstrap
 
         private readonly CustomFontInAppRelauncher? _customFontInAppRelauncher;
 
+        private readonly AvatarPresetWatcher? _avatarPresetWatcher;
+
         public Watcher()
         {
             const string LOG_IDENT = "Watcher";
@@ -60,7 +62,7 @@ namespace Bloxstrap
             if (App.Settings.Prop.EnableWindowManipulation && _watcherData.Handle != 0)
                 WindowManipulation = new(_watcherData.Handle, _watcherData.ProcessId);
 
-            if (App.Settings.Prop.EnableActivityTracking || _watcherData.EnableInAppCustomFontRelaunch)
+            if (App.Settings.Prop.EnableActivityTracking || _watcherData.EnableInAppCustomFontRelaunch || _watcherData.EnableAvatarPresetWatcher)
             {
                 ActivityWatcher = new(_watcherData.LogFile);
 
@@ -68,6 +70,13 @@ namespace Bloxstrap
                 {
                     _customFontInAppRelauncher = new(_watcherData.ProcessId, _watcherData.CustomFontActiveForLaunch);
                     ActivityWatcher.OnGameJoining += (_, _) => _customFontInAppRelauncher.HandleGameJoining(ActivityWatcher.Data);
+                }
+
+                if (_watcherData.EnableAvatarPresetWatcher)
+                {
+                    _avatarPresetWatcher = new(_watcherData.AvatarPresetAppliedOutfitId);
+                    ActivityWatcher.OnGameJoining += (_, _) => _avatarPresetWatcher.HandleGameJoining(ActivityWatcher.Data);
+                    ActivityWatcher.OnGameLeave += (_, _) => _avatarPresetWatcher.HandleGameLeave();
                 }
 
                 if (App.Settings.Prop.UseDisableAppPatch)
@@ -133,6 +142,9 @@ namespace Bloxstrap
 
             if (_customFontInAppRelauncher is not null)
                 await _customFontInAppRelauncher.WaitForRelaunchAsync();
+
+            if (_avatarPresetWatcher is not null)
+                await _avatarPresetWatcher.RestoreDefault("Roblox close");
 
             if (_watcherData.AutoclosePids is not null)
             {

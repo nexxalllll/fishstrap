@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Input;
+using System.Collections.ObjectModel;
 
 using Microsoft.Win32;
 
@@ -16,6 +17,9 @@ namespace Bloxstrap.UI.ViewModels.Settings
 {
     public class ModsViewModel : NotifyPropertyChangedViewModel
     {
+        private string _avatarOutfitLoadStatus = "Load saved outfits to populate the dropdowns.";
+        private AvatarPresetRule? _selectedAvatarPresetRule;
+
         private void OpenModsFolder() => Process.Start("explorer.exe", Paths.Modifications);
 
         private readonly Dictionary<string, byte[]> FontHeaders = new()
@@ -65,6 +69,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public ICommand ManageCustomFontCommand => new RelayCommand(ManageCustomFont);
 
+        public ICommand AddAvatarPresetRuleCommand => new RelayCommand(AddAvatarPresetRule);
+
+        public ICommand DeleteAvatarPresetRuleCommand => new RelayCommand(DeleteAvatarPresetRule);
+
+        public ICommand LoadAvatarOutfitsCommand => new AsyncRelayCommand(LoadAvatarOutfits);
+
         public string CustomFontPlaceIdsText
         {
             get => String.Join(
@@ -97,6 +107,118 @@ namespace Bloxstrap.UI.ViewModels.Settings
                     .Where(placeId => !App.Settings.Prop.CustomFontExcludedPlaceIds.Contains(placeId))
                     .Distinct()
                     .ToList();
+            }
+        }
+
+        public bool AvatarPresetSwitcherEnabled
+        {
+            get => App.Settings.Prop.EnableAvatarPresetSwitcher;
+            set => App.Settings.Prop.EnableAvatarPresetSwitcher = value;
+        }
+
+        public bool RestoreAvatarPresetOnLeave
+        {
+            get => App.Settings.Prop.RestoreAvatarPresetOnLeave;
+            set => App.Settings.Prop.RestoreAvatarPresetOnLeave = value;
+        }
+
+        public string DefaultAvatarOutfitIdText
+        {
+            get => App.Settings.Prop.DefaultAvatarOutfitId > 0 ? App.Settings.Prop.DefaultAvatarOutfitId.ToString() : "";
+            set
+            {
+                App.Settings.Prop.DefaultAvatarOutfitId = ParsePositiveLong(value);
+                OnPropertyChanged(nameof(DefaultAvatarOutfitIdText));
+                OnPropertyChanged(nameof(DefaultAvatarOutfitId));
+            }
+        }
+
+        public long DefaultAvatarOutfitId
+        {
+            get => App.Settings.Prop.DefaultAvatarOutfitId;
+            set
+            {
+                App.Settings.Prop.DefaultAvatarOutfitId = value;
+                OnPropertyChanged(nameof(DefaultAvatarOutfitId));
+                OnPropertyChanged(nameof(DefaultAvatarOutfitIdText));
+            }
+        }
+
+        public ObservableCollection<AvatarPresetRule> AvatarPresetRules => App.Settings.Prop.AvatarPresetRules;
+
+        public ObservableCollection<AvatarOutfitModel> AvatarOutfits { get; } = new();
+
+        public string AvatarOutfitLoadStatus
+        {
+            get => _avatarOutfitLoadStatus;
+            set
+            {
+                _avatarOutfitLoadStatus = value;
+                OnPropertyChanged(nameof(AvatarOutfitLoadStatus));
+            }
+        }
+
+        public AvatarPresetRule? SelectedAvatarPresetRule
+        {
+            get => _selectedAvatarPresetRule;
+            set
+            {
+                _selectedAvatarPresetRule = value;
+
+                if (_selectedAvatarPresetRule is not null)
+                    UpdateAvatarPresetRuleOutfitName(_selectedAvatarPresetRule);
+
+                OnPropertyChanged(nameof(SelectedAvatarPresetRule));
+                OnPropertyChanged(nameof(IsAvatarPresetRuleSelected));
+                OnPropertyChanged(nameof(SelectedAvatarPresetRulePlaceIdText));
+                OnPropertyChanged(nameof(SelectedAvatarPresetRuleOutfitIdText));
+                OnPropertyChanged(nameof(SelectedAvatarPresetRuleOutfitId));
+            }
+        }
+
+        public int SelectedAvatarPresetRuleIndex { get; set; } = -1;
+
+        public bool IsAvatarPresetRuleSelected => SelectedAvatarPresetRule is not null;
+
+        public string SelectedAvatarPresetRulePlaceIdText
+        {
+            get => SelectedAvatarPresetRule?.PlaceId > 0 ? SelectedAvatarPresetRule.PlaceId.ToString() : "";
+            set
+            {
+                if (SelectedAvatarPresetRule is null)
+                    return;
+
+                SelectedAvatarPresetRule.PlaceId = ParsePositiveLong(value);
+                OnPropertyChanged(nameof(SelectedAvatarPresetRulePlaceIdText));
+            }
+        }
+
+        public string SelectedAvatarPresetRuleOutfitIdText
+        {
+            get => SelectedAvatarPresetRule?.OutfitId > 0 ? SelectedAvatarPresetRule.OutfitId.ToString() : "";
+            set
+            {
+                if (SelectedAvatarPresetRule is null)
+                    return;
+
+                SelectedAvatarPresetRule.OutfitId = ParsePositiveLong(value);
+                OnPropertyChanged(nameof(SelectedAvatarPresetRuleOutfitIdText));
+                OnPropertyChanged(nameof(SelectedAvatarPresetRuleOutfitId));
+            }
+        }
+
+        public long SelectedAvatarPresetRuleOutfitId
+        {
+            get => SelectedAvatarPresetRule?.OutfitId ?? 0;
+            set
+            {
+                if (SelectedAvatarPresetRule is null)
+                    return;
+
+                SelectedAvatarPresetRule.OutfitId = value;
+                UpdateAvatarPresetRuleOutfitName(SelectedAvatarPresetRule);
+                OnPropertyChanged(nameof(SelectedAvatarPresetRuleOutfitId));
+                OnPropertyChanged(nameof(SelectedAvatarPresetRuleOutfitIdText));
             }
         }
 
@@ -146,6 +268,90 @@ namespace Bloxstrap.UI.ViewModels.Settings
             else
                 Frontend.ShowMessageBox(Strings.Common_RobloxNotInstalled, MessageBoxImage.Error);
 
+        }
+
+        private void AddAvatarPresetRule()
+        {
+            AvatarPresetRules.Add(new AvatarPresetRule());
+            SelectedAvatarPresetRule = AvatarPresetRules.Last();
+            SelectedAvatarPresetRuleIndex = AvatarPresetRules.Count - 1;
+            OnPropertyChanged(nameof(SelectedAvatarPresetRuleIndex));
+            OnPropertyChanged(nameof(IsAvatarPresetRuleSelected));
+        }
+
+        private void DeleteAvatarPresetRule()
+        {
+            if (SelectedAvatarPresetRule is null)
+                return;
+
+            int removedIndex = AvatarPresetRules.IndexOf(SelectedAvatarPresetRule);
+            AvatarPresetRules.Remove(SelectedAvatarPresetRule);
+
+            if (AvatarPresetRules.Count == 0)
+            {
+                SelectedAvatarPresetRule = null;
+                SelectedAvatarPresetRuleIndex = -1;
+            }
+            else
+            {
+                SelectedAvatarPresetRuleIndex = Math.Clamp(removedIndex, 0, AvatarPresetRules.Count - 1);
+                SelectedAvatarPresetRule = AvatarPresetRules[SelectedAvatarPresetRuleIndex];
+            }
+
+            OnPropertyChanged(nameof(SelectedAvatarPresetRuleIndex));
+            OnPropertyChanged(nameof(IsAvatarPresetRuleSelected));
+        }
+
+        private async Task LoadAvatarOutfits()
+        {
+            try
+            {
+                AvatarOutfitLoadStatus = "Loading saved outfits...";
+
+                if (!App.Settings.Prop.AllowCookieAccess)
+                {
+                    AvatarOutfitLoadStatus = "Enable Account Access on the Bootstrapper page first.";
+                    return;
+                }
+
+                var outfits = await AvatarPresetSwitcher.GetSavedOutfits();
+
+                AvatarOutfits.Clear();
+
+                foreach (var outfit in outfits)
+                    AvatarOutfits.Add(outfit);
+
+                foreach (var rule in AvatarPresetRules)
+                    UpdateAvatarPresetRuleOutfitName(rule);
+
+                AvatarOutfitLoadStatus = outfits.Count == 0
+                    ? "No saved outfits were found for the signed-in account."
+                    : $"Loaded {outfits.Count} saved outfits. Personal creations are listed first.";
+            }
+            catch (Exception ex)
+            {
+                AvatarOutfitLoadStatus = "Saved outfits could not be loaded.";
+                App.Logger.WriteLine("ModsViewModel::LoadAvatarOutfits", "Failed to load avatar outfits");
+                App.Logger.WriteException("ModsViewModel::LoadAvatarOutfits", ex);
+            }
+        }
+
+        private static long ParsePositiveLong(string? value)
+        {
+            if (long.TryParse(value, out long number) && number > 0)
+                return number;
+
+            return 0;
+        }
+
+        private void UpdateAvatarPresetRuleOutfitName(AvatarPresetRule rule)
+        {
+            var outfit = AvatarOutfits.FirstOrDefault(x => x.Id == rule.OutfitId);
+
+            if (outfit is null || rule.OutfitName == outfit.Name)
+                return;
+
+            rule.OutfitName = outfit.Name;
         }
     }
 }

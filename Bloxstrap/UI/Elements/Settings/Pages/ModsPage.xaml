@@ -108,5 +108,57 @@
                      VerticalScrollBarVisibility="Auto"
                      Text="{Binding CustomFontPlaceIdsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
         </controls:OptionControl>
+
+        <controls:OptionControl
+            Header="Avatar presets"
+            Description="Apply saved Roblox avatar creations by Game / Place ID. The default outfit is used for games without a matching rule and restored after leaving a game-specific outfit. Requires Account Access on the Bootstrapper page.">
+            <StackPanel Width="380">
+                <ui:ToggleSwitch Content="Enable avatar presets" IsChecked="{Binding AvatarPresetSwitcherEnabled, Mode=TwoWay}" />
+
+                <StackPanel Margin="0,8,0,0" IsEnabled="{Binding AvatarPresetSwitcherEnabled, Mode=OneWay}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:Button Grid.Column="1" Icon="ArrowSync24" Content="Load saved outfits" Command="{Binding LoadAvatarOutfitsCommand}" />
+                    </Grid>
+                    <TextBlock Margin="0,4,0,0" FontSize="12" Text="{Binding AvatarOutfitLoadStatus}" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+
+                    <TextBlock Margin="0,10,0,0" Text="Default outfit" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <ComboBox Margin="0,4,0,0" ItemsSource="{Binding AvatarOutfits}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding DefaultAvatarOutfitId, Mode=TwoWay}" />
+
+                    <CheckBox Margin="0,8,0,0" Content="Restore the default outfit after leaving a game-specific outfit" IsChecked="{Binding RestoreAvatarPresetOnLeave, Mode=TwoWay}" />
+
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="120" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <ListBox Grid.Row="0" Grid.Column="0" Margin="0,0,4,0" ItemsSource="{Binding AvatarPresetRules}" DisplayMemberPath="DisplayName" SelectedItem="{Binding SelectedAvatarPresetRule, Mode=TwoWay}" SelectedIndex="{Binding SelectedAvatarPresetRuleIndex, Mode=TwoWay}" />
+                        <Grid Grid.Row="1" Grid.Column="0" Margin="0,8,4,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ui:Button Grid.Column="0" Margin="0,0,4,0" Icon="Add28" Content="{x:Static resources:Strings.Common_New}" HorizontalAlignment="Stretch" Command="{Binding AddAvatarPresetRuleCommand}" />
+                            <ui:Button Grid.Column="1" Margin="4,0,0,0" Icon="Delete28" Content="{x:Static resources:Strings.Common_Delete}" HorizontalAlignment="Stretch" Appearance="Danger" IsEnabled="{Binding IsAvatarPresetRuleSelected, Mode=OneWay}" Command="{Binding DeleteAvatarPresetRuleCommand}" />
+                        </Grid>
+
+                        <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Margin="4,0,0,0" IsEnabled="{Binding IsAvatarPresetRuleSelected, Mode=OneWay}">
+                            <TextBlock Text="Game / Place ID" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <ui:TextBox Margin="0,4,0,0" PlaceholderText="Place ID" Text="{Binding SelectedAvatarPresetRulePlaceIdText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Margin="0,8,0,0" Text="Outfit" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <ComboBox Margin="0,4,0,0" ItemsSource="{Binding AvatarOutfits}" DisplayMemberPath="DisplayName" SelectedValuePath="Id" SelectedValue="{Binding SelectedAvatarPresetRuleOutfitId, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+        </controls:OptionControl>
     </StackPanel>
 </ui:UiPage>
