@@ -280,6 +280,7 @@ namespace Bloxstrap.Utility
         private readonly AvatarPresetSwitcher _switcher;
         private readonly long _defaultOutfitId;
         private readonly SemaphoreSlim _restoreSemaphore = new(1, 1);
+        private CancellationTokenSource? _leaveRestoreCancellation;
 
         internal AvatarPresetWatcher(long currentOutfitId)
         {
@@ -291,6 +292,8 @@ namespace Bloxstrap.Utility
         {
             if (!AvatarPresetRules.HasRules)
                 return;
+
+            CancelPendingLeaveRestore();
 
             _ = Task.Run(async () =>
             {
@@ -308,11 +311,19 @@ namespace Bloxstrap.Utility
 
         internal void HandleGameLeave()
         {
-            _ = RestoreDefault("game leave");
+            CancelPendingLeaveRestore();
+
+            var cancellation = new CancellationTokenSource();
+            _leaveRestoreCancellation = cancellation;
+
+            _ = RestoreDefaultAfterLeaveDelay(cancellation);
         }
 
         internal async Task RestoreDefault(string reason)
         {
+            if (!String.Equals(reason, "game leave", StringComparison.OrdinalIgnoreCase))
+                CancelPendingLeaveRestore();
+
             if (_defaultOutfitId <= 0)
                 return;
 
@@ -326,6 +337,37 @@ namespace Bloxstrap.Utility
             {
                 _restoreSemaphore.Release();
             }
+        }
+
+        private async Task RestoreDefaultAfterLeaveDelay(CancellationTokenSource cancellation)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(10), cancellation.Token);
+                await RestoreDefault("game leave");
+            }
+            catch (OperationCanceledException)
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Skipped game leave restore because another game join started");
+            }
+            finally
+            {
+                if (ReferenceEquals(_leaveRestoreCancellation, cancellation))
+                    _leaveRestoreCancellation = null;
+
+                cancellation.Dispose();
+            }
+        }
+
+        private void CancelPendingLeaveRestore()
+        {
+            var cancellation = _leaveRestoreCancellation;
+            _leaveRestoreCancellation = null;
+
+            if (cancellation is null)
+                return;
+
+            cancellation.Cancel();
         }
     }
 }

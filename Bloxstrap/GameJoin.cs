@@ -39,8 +39,14 @@ namespace Bloxstrap
             string rawPlaceLancherUrl = null!;
             GameJoinData joinData = new(); // by default its unknown
 
+            if (TryParseExperienceStartDeeplink(launchCommandLine, joinData))
+            {
+                App.Logger.WriteLine(LOG_IDENT, $"Join type: {joinData.JoinType}");
+                return joinData;
+            }
+
             if (!launchCommandLine.StartsWith("roblox-player:"))
-                return joinData; // its either empty or deeplink start, those arent supported (yet?)
+                return joinData; // its either empty or a launch format we don't handle
 
             Match urlMatch = Regex.Match(launchCommandLine, placelauncherPattern);
             if (!urlMatch.Success || urlMatch.Groups.Count != 3) return joinData; // the regex failed
@@ -129,6 +135,47 @@ namespace Bloxstrap
             App.Logger.WriteLine(LOG_IDENT, $"Join type: {joinData.JoinType}");
 
             return joinData;
+        }
+
+        private static bool TryParseExperienceStartDeeplink(string launchCommandLine, GameJoinData joinData)
+        {
+            const string launchPrefix = "roblox://experiences/start";
+
+            if (!launchCommandLine.StartsWith(launchPrefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            string decodedLaunchCommand = WebUtility.UrlDecode(launchCommandLine);
+
+            if (!Uri.TryCreate(decodedLaunchCommand, UriKind.Absolute, out Uri? uri))
+                return false;
+
+            var query = HttpUtility.ParseQueryString(uri.Query);
+
+            if (!long.TryParse(query["placeId"], out long placeId) || placeId == 0)
+                return false;
+
+            string? gameInstanceId = query["gameInstanceId"] ?? query["gameId"];
+            string? accessCode = query["accessCode"] ?? query["privateServerLinkCode"];
+
+            joinData.PlaceLauncherUrl = decodedLaunchCommand;
+            joinData.PlaceId = placeId;
+
+            if (!String.IsNullOrEmpty(accessCode))
+            {
+                joinData.JoinType = GameJoinType.RequestPrivateGame;
+                joinData.AccessCode = accessCode;
+            }
+            else if (!String.IsNullOrEmpty(gameInstanceId))
+            {
+                joinData.JoinType = GameJoinType.RequestGameJob;
+                joinData.JobId = gameInstanceId;
+            }
+            else
+            {
+                joinData.JoinType = GameJoinType.RequestGame;
+            }
+
+            return true;
         }
     }
 }

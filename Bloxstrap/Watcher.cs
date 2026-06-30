@@ -144,7 +144,10 @@ namespace Bloxstrap
                 await _customFontInAppRelauncher.WaitForRelaunchAsync();
 
             if (_avatarPresetWatcher is not null)
+            {
+                await WaitForRobloxPlayerProcessesToExit();
                 await _avatarPresetWatcher.RestoreDefault("Roblox close");
+            }
 
             if (_watcherData.AutoclosePids is not null)
             {
@@ -166,6 +169,41 @@ namespace Bloxstrap
             App.State.Prop.WatcherRunning = false;
 
             GC.SuppressFinalize(this);
+        }
+
+        private static async Task WaitForRobloxPlayerProcessesToExit()
+        {
+            const string LOG_IDENT = "Watcher::WaitForRobloxPlayerProcessesToExit";
+
+            bool logged = false;
+
+            while (IsAnyRobloxPlayerProcessRunning())
+            {
+                if (!logged)
+                {
+                    App.Logger.WriteLine(LOG_IDENT, "Waiting for remaining Roblox player processes before restoring avatar preset");
+                    logged = true;
+                }
+
+                await Task.Delay(1000);
+            }
+        }
+
+        private static bool IsAnyRobloxPlayerProcessRunning()
+        {
+            string processName = Path.GetFileNameWithoutExtension(App.RobloxPlayerAppName);
+
+            return Utilities.GetProcessesSafe().Any(process =>
+            {
+                try
+                {
+                    return process.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase);
+                }
+                catch
+                {
+                    return false;
+                }
+            });
         }
     }
 }

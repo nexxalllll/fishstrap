@@ -1517,8 +1517,7 @@ namespace Bloxstrap
             if (joinData.PlaceId is not null)
                 return joinData.PlaceId;
 
-            // Fallback for launch formats GameJoin does not currently understand,
-            // such as roblox://experiences/start?placeId=123.
+            // Fallback for any future launch formats GameJoin does not understand yet.
             string decodedLaunchCommand = WebUtility.UrlDecode(_launchCommandLine);
             Match placeIdMatch = Regex.Match(decodedLaunchCommand, @"placeId=([0-9]+)", RegexOptions.IgnoreCase);
 
