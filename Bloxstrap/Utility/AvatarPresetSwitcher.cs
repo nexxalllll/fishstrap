@@ -10,7 +10,7 @@ namespace Bloxstrap.Utility
             Enabled &&
             (DefaultOutfitId > 0 || App.Settings.Prop.AvatarPresetRules.Any(rule => rule.PlaceId > 0 && rule.OutfitId > 0));
 
-        internal static long? GetOutfitIdForPlace(long? placeId)
+        internal static long? GetOutfitIdForPlace(long? placeId, bool allowDefault = true)
         {
             if (!Enabled)
                 return null;
@@ -23,7 +23,7 @@ namespace Bloxstrap.Utility
                     return rule.OutfitId;
             }
 
-            return DefaultOutfitId > 0 ? DefaultOutfitId : null;
+            return allowDefault && DefaultOutfitId > 0 ? DefaultOutfitId : null;
         }
     }
 
@@ -150,9 +150,9 @@ namespace Bloxstrap.Utility
             !String.IsNullOrEmpty(value) &&
             value.Contains("bundle", StringComparison.OrdinalIgnoreCase);
 
-        internal async Task<AvatarPresetApplyResult?> ApplyForPlace(long? placeId, string reason)
+        internal async Task<AvatarPresetApplyResult?> ApplyForPlace(long? placeId, string reason, bool allowDefault = true)
         {
-            long? outfitId = AvatarPresetRules.GetOutfitIdForPlace(placeId);
+            long? outfitId = AvatarPresetRules.GetOutfitIdForPlace(placeId, allowDefault);
 
             if (outfitId is null)
                 return null;

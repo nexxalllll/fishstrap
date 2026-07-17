@@ -776,7 +776,16 @@ namespace Bloxstrap
                 if (AvatarPresetRules.HasRules)
                 {
                     long? placeId = GetLaunchPlaceId();
-                    avatarPresetApplyResult = await new AvatarPresetSwitcher().ApplyForPlace(placeId, placeId is null ? "player launch" : $"launch PlaceId {placeId}");
+                    bool allowDefault = placeId is not null || _joinData.JoinType != GameJoinType.RequestFollowUser;
+
+                    if (!allowDefault)
+                        App.Logger.WriteLine(LOG_IDENT, "Follow-user launch did not include a PlaceId; deferring avatar preset until Roblox reports the joined place");
+
+                    avatarPresetApplyResult = await new AvatarPresetSwitcher().ApplyForPlace(
+                        placeId,
+                        placeId is null ? "player launch" : $"launch PlaceId {placeId}",
+                        allowDefault
+                    );
                 }
             }
 

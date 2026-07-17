@@ -145,8 +145,10 @@ namespace Bloxstrap
 
             if (_avatarPresetWatcher is not null)
             {
-                await WaitForRobloxPlayerProcessesToExit();
-                await _avatarPresetWatcher.RestoreDefault("Roblox close");
+                if (await WaitForRobloxPlayerProcessesToExit(TimeSpan.FromSeconds(15)))
+                    await _avatarPresetWatcher.RestoreDefault("Roblox close");
+                else
+                    App.Logger.WriteLine("Watcher", "Skipping Roblox close avatar restore because another Roblox player process is still running");
             }
 
             if (_watcherData.AutoclosePids is not null)
@@ -171,11 +173,12 @@ namespace Bloxstrap
             GC.SuppressFinalize(this);
         }
 
-        private static async Task WaitForRobloxPlayerProcessesToExit()
+        private static async Task<bool> WaitForRobloxPlayerProcessesToExit(TimeSpan timeout)
         {
             const string LOG_IDENT = "Watcher::WaitForRobloxPlayerProcessesToExit";
 
             bool logged = false;
+            DateTimeOffset timeoutAt = DateTimeOffset.Now.Add(timeout);
 
             while (IsAnyRobloxPlayerProcessRunning())
             {
@@ -185,8 +188,13 @@ namespace Bloxstrap
                     logged = true;
                 }
 
+                if (DateTimeOffset.Now >= timeoutAt)
+                    return false;
+
                 await Task.Delay(1000);
             }
+
+            return true;
         }
 
         private static bool IsAnyRobloxPlayerProcessRunning()
